@@ -20,16 +20,29 @@ PAGE="$DIR/solar-system-3d.html"
 HOST="$DIR/solar-webkit.py"
 
 # ---- log file, resolved without assuming an environment -------------------
+# The log path must end up *writable*, not merely plausible: the host is
+# started with `>>"$LOG"`, and a redirection that cannot be opened makes sh
+# fail the command, so the theme would exit without drawing anything and
+# without leaving a trace (measured: read-only $HOME/.cache -> saver never
+# started).  Candidates are probed, then /dev/null is the last resort.
 HOME_DIR=${HOME:-}
 if [ -z "$HOME_DIR" ] && command -v getent >/dev/null 2>&1; then
     HOME_DIR=$(getent passwd "$(id -u)" 2>/dev/null | cut -d: -f6)
 fi
 [ -n "$HOME_DIR" ] || HOME_DIR=/tmp
 CACHE_DIR=${XDG_CACHE_HOME:-$HOME_DIR/.cache}
-LOG=$CACHE_DIR/solar-screensaver.log
-if [ ! -d "$CACHE_DIR" ]; then
-    mkdir -p "$CACHE_DIR" 2>/dev/null || LOG=/tmp/solar-screensaver.log
-fi
+
+log_writable() {
+    _d=$(dirname "$1")
+    [ -d "$_d" ] || mkdir -p "$_d" 2>/dev/null || return 1
+    ( : >>"$1" ) 2>/dev/null
+}
+
+LOG=
+for _cand in "$CACHE_DIR/solar-screensaver.log" "/tmp/solar-screensaver.log"; do
+    if log_writable "$_cand"; then LOG=$_cand; break; fi
+done
+[ -n "$LOG" ] || LOG=/dev/null
 
 log() {
     printf '%s  %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*" >> "$LOG" 2>/dev/null || return 0
@@ -69,8 +82,18 @@ xset s off -dpms 2>/dev/null || true
 # it stays small (trimmed to 200 lines below)
 DEBUG_ARG="--debug"
 
+# One complete copy of the scene per monitor: the host builds one window per
+# monitor by itself when neither --area nor --monitor pins a single rectangle.
+# Orbits and labels are asked for explicitly (the page defaults to on, but a
+# screensaver has no UI to switch them back on).  The frame rate is capped so
+# that N monitors cost N x 30 fps instead of N x 60: the simulation keeps
+# advancing with the real elapsed time, only the drawing is throttled.
+SAVER_FPS=${SOLAR_SAVER_FPS:-30}
+
 # shellcheck disable=SC2086
-python3 "$HOST" --mode saver --saver 1 --speed 6 $DEBUG_ARG --url "$PAGE" "$@" >>"$LOG" 2>&1 &
+log_writable "$LOG" || LOG=/dev/null   # never let the log break the launch
+python3 "$HOST" --mode saver --saver 1 --speed 6 $DEBUG_ARG \
+    --with-orbits --with-labels --fps "$SAVER_FPS" --url "$PAGE" "$@" >>"$LOG" 2>&1 &
 PID=$!
 RC=0
 

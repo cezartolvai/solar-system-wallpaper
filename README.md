@@ -36,14 +36,36 @@ pkill -f solar-webkit.py                      # oprește-l
 |---|---|
 | simularea `solar-system-3d.html` | ✅ **funcțională** — orbite kepleriene reale, iluminare calculată, inele, centură de asteroizi; 60 fps la 1366×768 și 390×844; zero erori JS |
 | fundal live `solar-wallpaper.sh` | ✅ **stabil, în uz zilnic** — monitorul 2, fără orbite/etichete, pornire automată la login |
-| screensaver `solar-saver.sh` + tema MATE | ✅ **funcțional** — necesită runtime-ul în directorul de teme al daemonului (vezi mai jos) |
+| screensaver `solar-saver.sh` + tema MATE | ✅ **funcțional** — câte o copie pe fiecare monitor, cu orbite și etichete; necesită runtime-ul în directorul de teme al daemonului (vezi mai jos) |
 
-### Screensaver: ce e verificat și ce nu
+### Screensaver: ce e verificat
 
 **Verificat:** gazda desenează în fereastra dată de daemon prin contractul
 `XSCREENSAVER_WINDOW` (reparentare X11, nu `Gtk.Plug`), potrivește visualul ferestrei
-gazdă, are handler X non-fatal care loghează în loc să moară, iar rulat manual
-(`solar-saver.sh`) pornește corect fullscreen.
+gazdă, are handler X non-fatal care loghează în loc să moară; daemonul rezolvă comanda
+(„Setting command for job: …") și pornește tema pe **ambele** monitoare.
+
+**Câte o copie pe fiecare monitor.** Când gazda își deschide singură ferestrele (rulare
+manuală, xscreensaver), construiește **un panou per monitor** — fereastră + WebView
+separate, fiecare cu scena lui completă, centrată pe ecranul ei. O singură fereastră
+peste tot desktopul virtual ar pune Soarele exact pe marginea dintre monitoare.
+
+Măsurat (2 × 1920×1080): două ferestre la `1920x1080+0+0` și `1920x1080+1920+0`, ambele
+`IsViewable`, ambele cu cerul nocturn (medie RGB (4,6,13), 32 % pixeli negri) — adică
+două copii identice, una pe ecran. Ferestrele sunt **override-redirect** (fără window
+manager): Marco ignoră și poziția cerută, și stivuirea ferestrelor gestionate — ambele
+panouri ajungeau pe monitorul cu cursorul, iar fereastra „Desktop" a cajei (3840×1080,
+peste tot desktopul virtual) rămânea deasupra lor. Dovada: `import -window <id>` arăta
+scena corectă în timp ce ecranul arăta desktopul. `--managed` păstrează comportamentul
+vechi, pentru comparație.
+
+**Orbite și etichete:** `solar-saver.sh` le cere explicit (`--with-orbits --with-labels`),
+pentru că un screensaver nu are interfață din care să le aprinzi. Verificat la nivel de
+DOM, cu exact URL-ul folosit de screensaver: `body:"saver"`, `orbits:"true"`,
+`labels:"true"`, zero erori; cu `orbits=0&labels=0` ambele devin `false`.
+
+**Ritmul de desenare:** implicit `--fps 30` (`SOLAR_SAVER_FPS`), fiindcă N monitoare
+înseamnă N randare WebKit; simularea avansează în continuare cu timpul real.
 
 **Instalare pentru screensaver:** daemonul lansează doar teme al căror `Exec` se află în
 directorul lui de engine (`/usr/libexec/mate-screensaver`) — regula e citată din sursa
@@ -54,15 +76,11 @@ SOLAR_SYSTEM_WIDE=1 ./install-solar-screensaver.sh install     # sudo, o singur�
 mate-screensaver-command --exit ; nohup mate-screensaver >/dev/null 2>&1 &
 ```
 
-**Istoric:** pe MATE 1.26.2, `mate-screensaver`
-**nu lansează tema** la activare — jurnalul `~/.cache/solar-screensaver.log` rămâne gol,
-deși tema e instalată system-wide, are alias pentru ID-ul din `gsettings` și `--root`
-în `Exec`. Rezolvarea temelor în daemon se face la activare, deci diagnosticul cere
-capturarea ieșirii de debug **în timpul activării** (rețetă în `MANIFEST.md`,
-secțiunea „Depanare screensaver").
-
-Până atunci: **folosește fundalul live**; screensaver-ul rămâne în repo ca punct de
-plecare documentat, nu ca funcție gata de folosit.
+**Istoric (rezolvat):** pe MATE 1.26.2 tema nu pornea deloc pentru că `Exec` era în
+`$HOME` — daemonul acceptă doar programe din directorul lui de engine. Rezolvat cu
+instalarea în `/usr/libexec/mate-screensaver` (vezi mai sus). Rețeta de depanare rămâne
+în `MANIFEST.md`, secțiunea „Depanare screensaver": `./diagnose-screensaver.sh` arată
+comanda rezolvată de daemon pentru fiecare ID de temă.
 
 Configurația fundalului: `~/.config/solar-screensaver/wallpaper.conf`
 (arie, viteză, straturi, orbite, etichete) — implicit pe monitorul 2, fără orbite și

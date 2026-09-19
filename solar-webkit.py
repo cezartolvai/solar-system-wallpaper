@@ -213,12 +213,17 @@ class SolarHost(object):
         self._parent_gdk = None
         self._xlib_handle = None
 
-        self.webview = WebKit2.WebView()
-        # When we draw inside somebody else's window (screensaver themes) the
-        # accelerated (GL) compositing path is what makes WebKit insist on an
-        # RGBA visual, which then conflicts with a 24-bit host window.  Plain
-        # software rendering is a few percent slower and always works.
-        self._tune_webview(force_accel=bool(args.hw_accel))
+        # One pane = one window with its own WebView, i.e. one independent copy
+        # of the page.  A multi-monitor desktop gets one pane per monitor: a
+        # single window stretched over the whole virtual screen would put the
+        # Sun exactly on the bezel between two screens, with every body cut in
+        # half.  Each pane renders a complete scene of its own instead.
+        self.panes = []                  # [[window, view, (x, y, w, h)], ...]
+        self.webviews = []               # every view, in pane order
+        self.webview = None              # the first one; embedded mode has only it
+        self.window = None               # the first pane's window
+        self.targets = []                # one rectangle per pane
+        self.unmanaged = False           # panes mapped without the WM
 
         query = args.query or ""
         if args.saver is not None:
@@ -259,8 +264,23 @@ class SolarHost(object):
             self._build_window(args)
 
     # -- setup -------------------------------------------------------------
-    def _tune_webview(self, force_accel=False):
-        s = self.webview.get_settings()
+    def _new_view(self):
+        """Create and configure one WebView (one independent copy of the page).
+
+        When drawing inside somebody else's window (screensaver themes) the
+        accelerated (GL) compositing path is what makes WebKit insist on an
+        RGBA visual, which then conflicts with a 24-bit host window.  Plain
+        software rendering is a few percent slower and always works.
+        """
+        view = WebKit2.WebView()
+        self._tune_webview(view, force_accel=bool(self.args.hw_accel))
+        self.webviews.append(view)
+        if self.webview is None:
+            self.webview = view
+        return view
+
+    def _tune_webview(self, view, force_accel=False):
+        s = view.get_settings()
         for prop, value in (
             ("enable_javascript", True),
             ("enable_webgl", False),            # the page is pure Canvas 2D
@@ -281,7 +301,7 @@ class SolarHost(object):
                 except Exception:
                     pass
         # a screensaver must not offer a context menu
-        self.webview.connect("context-menu", lambda *_: True)
+        view.connect("context-menu", lambda *_: True)
         if self.args.debug:
             # WebKitGTK dropped the ::console-message signal in 2.40, so page
             # errors are routed to the console instead and picked up by the
@@ -290,23 +310,29 @@ class SolarHost(object):
                     "console.error('[page error] '+e.message+' @'+e.lineno);});"
                     "window.addEventListener('unhandledrejection',function(){"
                     "console.error('[page rejection]');});")
-            self.webview.get_user_content_manager().add_script(
+            view.get_user_content_manager().add_script(
                 WebKit2.UserScript.new(hook, WebKit2.UserContentInjectedFrames.TOP_FRAME,
                                        WebKit2.UserScriptInjectionTime.START, None, None))
-        self.webview.connect("load-failed", self._on_load_failed)
-        self.webview.connect("load-changed", self._on_load_changed)
+        view.connect("load-failed", self._on_load_failed)
+        view.connect("load-changed", self._on_load_changed)
 
     def _on_load_failed(self, _view, _event, failing, error):
         sys.stderr.write("solar-webkit: load failed: %s (%s)\n" % (failing, error))
         return False
 
-    def _on_load_changed(self, _view, event):
+    def _on_load_changed(self, view, event):
         if self.args.debug:
             names = {WebKit2.LoadEvent.STARTED: "started",
                      WebKit2.LoadEvent.REDIRECTED: "redirected",
                      WebKit2.LoadEvent.COMMITTED: "committed",
                      WebKit2.LoadEvent.FINISHED: "finished"}
-            sys.stderr.write("load: %s %s\n" % (names.get(event, event), self.uri))
+            tag = ""
+            if len(self.webviews) > 1:          # say which copy loaded
+                try:
+                    tag = "[pane %d] " % (self.webviews.index(view) + 1)
+                except ValueError:
+                    tag = ""
+            sys.stderr.write("load: %s%s %s\n" % (tag, names.get(event, event), self.uri))
         return False
 
     @staticmethod
@@ -326,22 +352,65 @@ class SolarHost(object):
             win.set_type_hint(Gdk.WindowTypeHint.NORMAL)
             win.set_keep_below(True)
 
+    def _resolve_targets(self):
+        """One rectangle per pane: an explicit --area, or one per monitor.
+
+        Mirrored (cloned) monitors report the same rectangle several times;
+        drawing the same scene twice on top of itself only wastes a full
+        renderer, so duplicates are dropped.
+        """
+        if self.args.area_box is not None:
+            return [self.args.area_box]
+        n = self.display.get_n_monitors() if self.display is not None else 0
+        if self.args.monitor is not None or n <= 1:
+            return [monitor_geometry(self.display, self.args.monitor, None)]
+        seen, out = set(), []
+        for i in range(n):
+            g = self.display.get_monitor(i).get_geometry()
+            box = (g.x, g.y, g.width, g.height)
+            if box in seen:
+                continue
+            seen.add(box)
+            out.append(box)
+        return out or [(0, 0, 1920, 1080)]
+
     def _build_window(self, args):
+        self.targets = self._resolve_targets()
+
+        if self.args.dry_run:
+            for i, (x, y, w, h) in enumerate(self.targets):
+                sys.stdout.write(
+                    "dry-run : role=%s pane=%d/%d geometry=%dx%d+%d+%d monitors=%d url=%s\n"
+                    % (args.mode, i + 1, len(self.targets), w, h, x, y,
+                       self.display.get_n_monitors() if self.display else 0, self.uri))
+            return
+
+        for i, geo in enumerate(self.targets):
+            self._make_pane(args, geo, i)
+
+        screen = self.panes[0][0].get_screen()
+        screen.connect("monitors-changed", lambda *_: self._on_monitors_changed())
+        screen.connect("size-changed", lambda *_: self._apply_geometry())
+
+    def _make_pane(self, args, geo, index):
+        """Build one window (with its own WebView) at the given rectangle."""
+        view = self._new_view()
         win = Gtk.Window(type=Gtk.WindowType.TOPLEVEL)
         win.set_decorated(False)
         win.set_resizable(False)
         win.set_skip_taskbar_hint(True)
         win.set_skip_pager_hint(True)
         win.set_title("Solar System")
-        win.add(self.webview)
+        win.add(view)
 
         # Layer order on EWMH desktops, bottom to top:
         #     desktop < below < normal < above < dock
-        #  * saver   -> "below": covers the desktop and its icons, but every
-        #               normal window (the MATE lock dialog above all) stays on
-        #               top. This is the equivalent of an xscreensaver hack
-        #               drawing on the root window, and it is what keeps the
-        #               password prompt reachable when locking is enabled.
+        #  * saver   -> "normal": measured on MATE/Marco, a "below" window ends
+        #               up UNDER caja's own DESKTOP-layer window (which covers
+        #               the whole virtual screen), so the animation renders and
+        #               is never seen. A normal window may map over the desktop
+        #               and is still below the MATE lock dialog, which the WM
+        #               maps later; that keeps the password prompt reachable.
         #  * wallpaper -> "desktop": caja paints the icons in a desktop-layer
         #               window, so we join that layer and let the file manager
         #               stay on top of us.
@@ -350,21 +419,54 @@ class SolarHost(object):
             win.set_accept_focus(False)
             win.set_focus_on_map(False)
 
-        self.window = win
-        self._apply_geometry()
-
-        if self.args.dry_run:
-            x, y, w, h = monitor_geometry(self.display, self.args.monitor, self.args.area_box)
-            sys.stdout.write("dry-run : role=%s geometry=%dx%d+%d+%d monitors=%d url=%s\n"
-                             % (args.mode, w, h, x, y, self.display.get_n_monitors(), self.uri))
-            return
+        self.panes.append([win, view, geo])
+        if self.window is None:
+            self.window = win
         win.connect("realize", self._on_realize)
         win.connect("map-event", self._on_map)
         win.connect("delete-event", lambda *_: (Gtk.main_quit(), True)[1])
-        screen = win.get_screen()
-        screen.connect("monitors-changed", lambda *_: self._apply_geometry())
-        screen.connect("size-changed", lambda *_: self._apply_geometry())
+        if args.mode == "saver" and not args.managed:
+            # Take the window away from the window manager *before* it is
+            # mapped: measured on MATE/Marco, a managed window is placed by the
+            # WM (both panes ended up on the pointer's monitor, ignoring the
+            # requested rectangle) and stacked by the WM (caja's desktop window
+            # spans the whole virtual screen and stayed above it), so a managed
+            # window can neither sit on its own monitor nor be seen at all.
+            # Override-redirect hands position and stacking back to X, which is
+            # what xwinwrap and the classic screensaver hosts do.
+            win.realize()
+            gw = win.get_window()
+            if gw is not None:
+                try:
+                    gw.set_override_redirect(True)
+                    self.unmanaged = True
+                except Exception as exc:
+                    sys.stderr.write("unmanaged: not available (%s)\n" % exc)
         win.show_all()
+        if self.args.debug:
+            sys.stderr.write("pane %d/%d: %dx%d+%d+%d (stack=%s)\n"
+                             % (index + 1, len(self.targets), geo[2], geo[3],
+                                geo[0], geo[1], self.args.stack))
+        self._apply_geometry([[win, view, geo]])
+
+    def _on_monitors_changed(self):
+        """Monitors plugged/unplugged: rebuild the panes to match."""
+        targets = self._resolve_targets()
+        if targets == self.targets:
+            self._apply_geometry()
+            return False
+        if self.args.debug:
+            sys.stderr.write("monitors changed: %d -> %d pane(s)\n"
+                             % (len(self.targets), len(targets)))
+        self.targets = targets
+        dead, self.panes = self.panes, []
+        self.webviews, self.webview, self.window = [], None, None
+        for win, _view, _geo in dead:
+            win.destroy()
+        for i, geo in enumerate(targets):
+            self._make_pane(self.args, geo, i)
+        self._load()
+        return False
 
     # ------------------------------------------------------------------
     # embedding into a window owned by somebody else
@@ -411,9 +513,10 @@ class SolarHost(object):
             # anything is drawn.  WebKit can ask for an RGBA visual of its own
             # when hardware acceleration is on, so the target's visual wins.
             self._match_visual(win, xid_int)
-            self.webview.set_hexpand(True)
-            self.webview.set_vexpand(True)
-            win.add(self.webview)
+            view = self._new_view()
+            view.set_hexpand(True)
+            view.set_vexpand(True)
+            win.add(view)
             self.window = win
             self.embedded = True
             win.connect("realize", self._on_embed_realize)
@@ -579,10 +682,8 @@ class SolarHost(object):
             return False
         return True
 
-    def _apply_geometry(self):
-        if self.embedded:
-            return
-        """Size and place the window on the selected monitor(s).
+    def _apply_geometry(self, panes=None):
+        """Size and place every pane on its own monitor.
 
         NOTE: `Gtk.Window.resize()` is ignored for a non-resizable window
         before it is mapped — the window then comes up at GTK's default size
@@ -590,24 +691,41 @@ class SolarHost(object):
         way is `set_default_size()`, which becomes the size hint used at map
         time, plus a direct `move_resize()` on the Gdk window once it exists.
         """
-        x, y, w, h = monitor_geometry(self.display, self.args.monitor, self.args.area_box)
-        self.window.set_default_size(w, h)
-        self.window.move(x, y)
-        gw = self.window.get_window()
-        if gw is not None:                     # already realised: force it
-            gw.move_resize(x, y, w, h)
-        if self.args.debug:
-            sys.stderr.write("geometry: target %dx%d+%d+%d -> window %s\n"
-                             % (w, h, x, y,
-                                self.window.get_window().get_geometry()
-                                if self.window.get_window() else "(not realised)"))
+        if self.embedded:
+            return
+        for win, _view, geo in (self.panes if panes is None else panes):
+            x, y, w, h = geo
+            win.set_default_size(w, h)
+            win.move(x, y)
+            gw = win.get_window()
+            if gw is not None:                 # already realised: force it
+                gw.move_resize(x, y, w, h)
+            if self.args.debug:
+                sys.stderr.write("geometry: target %dx%d+%d+%d -> window %s\n"
+                                 % (w, h, x, y,
+                                    gw.get_geometry() if gw else "(not realised)"))
+
+    def _pane_of(self, win):
+        for pane in self.panes:
+            if pane[0] is win:
+                return [pane]
+        return None
 
     def _on_map(self, win, _event):
         # First pass as soon as the window exists, then one delayed repeat:
         # window managers with pointer-based placement (Marco/Metacity) may
         # honour their own monitor for the initial map but do obey an explicit
         # _NET_MOVERESIZE_WINDOW once the window is fully placed.
-        self._apply_geometry()
+        self._apply_geometry(self._pane_of(win))
+        if self.unmanaged or self.args.stack in ("normal", "above"):
+            # the map may have happened under the file manager's desktop
+            # window; raising is what makes the animation visible at all
+            gw = win.get_window()
+            if gw is not None:
+                try:
+                    gw.raise_()
+                except Exception:
+                    pass
         GLib.timeout_add(600, self._reapply_geometry)
         return False
 
@@ -646,7 +764,8 @@ class SolarHost(object):
         Gtk.main()
 
     def _load(self):
-        self.webview.load_uri(self.uri)
+        for view in self.webviews:
+            view.load_uri(self.uri)
         return False
 
 
@@ -794,7 +913,7 @@ def geometry_check(args):
                      args.area or ("all" if args.monitor is None else args.monitor), g, seen))
             Gtk.main_quit()
             return False
-        host.webview.evaluate_javascript(
+        host.webviews[0].evaluate_javascript(
             "window.innerWidth+'x'+window.innerHeight+' dpr='+devicePixelRatio",
             -1, None, None, None, done, None)
         return False
@@ -819,9 +938,15 @@ def main():
                         "whole monitor; useful to keep a region (for example where "
                         "the desktop icons live) free")
     p.add_argument("--stack", choices=("desktop", "below", "normal", "above"), default=None,
-                   help="window layer: screensaver defaults to below (keeps the "
-                        "lock dialog visible), wallpaper to desktop (keeps the "
-                        "desktop icons visible)")
+                   help="window layer: screensaver defaults to normal (one pane per "
+                        "monitor, raised above the desktop, still under the lock "
+                        "dialog), wallpaper to desktop (keeps the desktop icons "
+                        "visible)")
+    p.add_argument("--managed", action="store_true",
+                   help="let the window manager place the window (default for a "
+                        "self-managed screensaver window on X11 is override-redirect, "
+                        "because Marco/Metacity ignore both the requested position and "
+                        "the stacking of managed windows)")
     p.add_argument("--wid", default=None, help="embed into this X window id")
     p.add_argument("--url", default=DEFAULT_PAGE)
     p.add_argument("--query", default=None,
@@ -883,7 +1008,12 @@ def main():
             # desktop layer; the lock dialog (normal layer) still stays above.
             args.stack = "desktop"
         else:
-            args.stack = "below"
+            # One pane per monitor, each one raised just after it is mapped.
+            # "below" is NOT usable here: caja's desktop window covers the
+            # whole virtual screen in the desktop layer and, measured on
+            # MATE/Marco, ends up above a "below" window, so the saver would
+            # render perfectly and never be seen.
+            args.stack = "normal"
 
     if args.selftest:
         return selftest(args)

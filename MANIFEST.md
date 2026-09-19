@@ -24,13 +24,13 @@ O simulare 3D interactivă a sistemului solar, scrisă într-un **singur fișier
 
 Rulează `./verify.sh` pentru a compara checksum-urile de mai jos cu fișierele actuale.
 
-| fișier | rol | sha256 (v1.0.0) |
+| fișier | rol | sha256 (v1.0.6) |
 |---|---|---|
-| `solar-system-3d.html` | simularea: date astronomice, pipeline 3D scris de mână, interfață, modul `?saver` | `7df1176eabb40193…` |
-| `solar-webkit.py` | gazda GTK3 + WebKit2GTK: fereastră fullscreen / fundal / embedding prin reparentare X11, `--selftest`, `--geometry-check`, `--print` | `47e4def8a03c763a…` |
-| `solar-wallpaper.sh` | lansatorul de fundal: citește `wallpaper.conf`, pornește fără argumente | `b16b7bdf41dc85b4…` |
-| `solar-saver.sh` | lansatorul de screensaver: jurnal, DPMS, robust la mediu minimal | `b87e9ae4907f3dd7…` |
-| `install-solar-screensaver.sh` | installer/dezinstaler: copiază în `~/.local`, scrie tema, autostartul și `wallpaper.conf` | `4cd63b9219bfb6f8…` |
+| `solar-system-3d.html` | simularea: date astronomice, pipeline 3D scris de mână, interfață, modul `?saver` | `3372f3dfdf6cfea0…` |
+| `solar-webkit.py` | gazda GTK3 + WebKit2GTK: **un panou per monitor** (fereastră + WebView), override-redirect pentru ferestrele proprii de screensaver (`--managed` păstrează modul gestionat), fundal live, embedding prin reparentare X11 (`--wid`, contractul `XSCREENSAVER_WINDOW`), `--selftest`, `--geometry-check`, `--print`, `--fps` | `42ff0f71b0a4ab70…` |
+| `solar-wallpaper.sh` | lansatorul de fundal: citește `wallpaper.conf`, pornește fără argumente | `e4fa51608b12456f…` |
+| `solar-saver.sh` | lansatorul de screensaver: jurnal (cu fallback dacă nu e scriibil), DPMS, orbite + etichete explicite, 30 fps, robust la mediu minimal | `e9c88ba3ca8f3cdd…` |
+| `install-solar-screensaver.sh` | installer/dezinstaler: copiază în `~/.local`, scrie tema, autostartul și `wallpaper.conf` | `2bea6fd4abddc04b…` |
 | `README.md` | ghidul complet (română): instalare, parametri, capcane, alternativă Wayland | — |
 | `MANIFEST.md` | acest fișier | — |
 | `CHANGELOG.md` | istoricul deciziilor și al problemelor rezolvate (cu dovezi) | — |
@@ -80,6 +80,17 @@ Consum măsurat (monitorul 2, 1920×1080, WebKit cu accelerare hardware): ~29 % 
 nucleu la 60 fps nelimitat. Lansatorul fundalului limitează desenarea la **30 fps**
 (`?fps=30`), ceea ce reduce aproximativ la jumătate costul; se schimbă cu `FPS=` în
 `wallpaper.conf` sau `SOLAR_FPS=` la o rulare (`FPS=0` = nelimitat).
+
+Screensaverul (`solar-saver.sh`) nu se configurează din fișier: pornește mereu gazda cu
+
+```
+--mode saver --saver 1 --speed 6 --with-orbits --with-labels --fps 30
+```
+
+adică **o copie pe fiecare monitor** (gazda își deschide singură ferestrele, câte una per
+monitor), cu orbite și etichete aprinse (screensaverul nu are interfață), desenate la
+30 fps. `SOLAR_SAVER_FPS` schimbă limita. Argumentele suplimentare date scriptului se
+transmit gazdei (ex. `./solar-saver.sh --monitor 1` = doar monitorul 2, pentru teste).
 
 Setări MATE relevante:
 
@@ -206,6 +217,28 @@ nou installerul.
    (`XReparentWindow` + `XMoveResizeWindow` + `XMapWindow`), ca la xwinwrap.
 7. În `~/.xsession-errors` pot rămâne mesaje `GLib-CRITICAL … Source ID … not found`
    de la `mate-screensaver`: sunt inofensive, apar la fiecare ciclu de activare.
+
+---
+
+### Fereastră gestionată de WM = poziție și stivuire pierdute (măsurat 2026-09-19)
+
+Marco (ca Metacity) ignoră atât poziția cerută de client, cât și ordinea de stivuire
+pentru ferestrele gestionate: două panouri cerute la `+0+0` și `+1920+0` au ajuns ambele
+pe monitorul cu cursorul, iar fereastra „Desktop" a cajei (`3840x1080+0+0`, adică tot
+desktopul virtual) a rămas **deasupra** lor. Simptomul e înșelător: fereastra se
+desenează perfect (`import -window <id>` arăta cerul nocturn) dar pe ecran se vede
+desktopul. Pentru ferestre proprii de screensaver folosește **override-redirect**
+(`Gdk.Window.set_override_redirect(True)` înainte de mapare — ca `xwinwrap`); `--managed`
+păstrează comportamentul gestionat, pentru comparație. Nu confunda cu calea de fundal
+live, care e intenționat gestionată (strat `desktop`, sub iconițele cajei).
+
+### Redirecționarea jurnalului poate ucide lansarea (măsurat 2026-09-19)
+
+`python3 … >>"$LOG" 2>&1 &` nu execută comanda dacă `$LOG` nu poate fi deschis (sh
+raportează eroarea și trece mai departe), deci un `$HOME/.cache` nescriptibil însemna
+screensaver care nu apare deloc, fără nicio urmă. `solar-saver.sh` testează acum
+scrierea pentru fiecare candidat (`$XDG_CACHE_HOME`, `$HOME/.cache`, `/tmp`), cade pe
+`/dev/null` în ultimă instanță și reverifică imediat înainte de lansare.
 
 ---
 

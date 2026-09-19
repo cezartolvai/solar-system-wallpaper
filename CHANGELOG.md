@@ -111,6 +111,68 @@ lansat tema. Rețeta de depanare (cu debug-ul daemonului în timpul activării) 
 - `verify.sh` avertizează acum dacă `AREA` e gol (fundal peste tot desktopul).
 - Lecție pentru viitor: installerul nu are voie să distrugă starea utilizatorului.
 
+## 2026-09-19 — v1.0.4
+
+- **Runtime-ul mutat în directorul de engine al daemonului**
+  (`/usr/libexec/mate-screensaver`, cu `SOLAR_SYSTEM_WIDE=1`), pentru că
+  `mate-screensaver` refuză orice `Exec` din `$HOME` (regula din sursă: `MANIFEST.md` §7b).
+- `verify.sh` verifică acum și directorul din `Exec` (§3b), ca o temă instalată greșit să
+  fie prinsă imediat.
+
+## 2026-09-19 — v1.0.5
+
+- **Cauza dovedită din sursa oficială** (`src/gs-theme-manager.c`): `find_command()`
+  acceptă un `Exec` doar dacă directorul lui e în `known_engine_locations`
+  (`SAVERDIR` = `/usr/libexec/mate-screensaver`, `/usr/libexec/xscreensaver`,
+  `/usr/lib/xscreensaver`); altfel `gs_theme_info_get_exec()` întoarce NULL și jurnalul
+  arată `Setting command for job: 'NULL'` → `No command set for job.`
+- Copia sursei care dovedește regula: `_src/1.26-gs-theme-manager.c`.
+
+## 2026-09-19 — v1.0.6
+
+### Câte o copie pe fiecare monitor (screensaver care își deschide singur ferestrele)
+
+- Gazda construiește **un panou per monitor** (fereastră + WebView, fiecare cu scena lui
+  completă). Măsurat pe 2 × 1920×1080: `1920x1080+0+0` și `1920x1080+1920+0`, ambele
+  `IsViewable`, ambele cu cerul nocturn (medie RGB (4,6,13), 32 % negri).
+
+### De ce nu se vedea nimic (dovedit prin măsurători, nu presupus)
+
+- O fereastră **gestionată de WM** nu poate fi așezată pe monitorul cerut și nici ținută
+  deasupra desktopului: Marco a pus ambele panouri pe monitorul cu cursorul (ignorând
+  `--area`) și fereastra „Desktop" a cajei — 3840×1080, adică tot desktopul virtual —
+  a rămas deasupra lor. Dovada: `import -window <id>` arăta scena corectă în timp ce
+  `import -window root` arăta desktopul, iar în ordinea X fereastra cajei era ultima.
+- Soluția: **override-redirect** (`Gdk.Window.set_override_redirect(True)` înainte de
+  mapare), exact ca la `xwinwrap`; poziția și stivuirea revin lui X. `--managed` păstrează
+  comportamentul vechi pentru comparație. Verificat: ambele monitoare arată scena
+  (std 9,6 / 32 % negri, identic pe ambele — două copii).
+- Calea de fundal live nu se schimbă (un singur panou, strat `desktop`, gestionat):
+  re-verificată după refactor — `load: finished`, conținut propriu std 10,5 / 31,7 %
+  negri, animație 1,52 % din pixeli în 3 s.
+
+### Orbite, etichete și ritm în screensaver
+
+- `solar-saver.sh` cere explicit `--with-orbits --with-labels` (screensaver-ul nu are
+  interfață) și limitează desenarea la 30 fps (`SOLAR_SAVER_FPS`), fiindcă N monitoare
+  înseamnă N randare WebKit. Verificat la nivel de DOM cu URL-ul exact al screensaver-ului:
+  `orbits:"true"`, `labels:"true"`, `body:"saver"`, zero erori; cu `orbits=0&labels=0`
+  devin `false`.
+
+### Reparat: scriptul putea muri înainte să pornească gazda
+
+- `python3 … >>"$LOG" 2>&1 &` eșua (și scriptul ieșea fără să deseneze nimic) dacă
+  `$HOME/.cache` nu era scrisibil — redirecționarea care nu poate fi deschisă face `sh`
+  să nu execute comanda. Reproduit în sandbox („cannot create … Read-only file system"):
+  fereastră niciuna. Acum se testează scrierea pentru fiecare candidat, apoi `/tmp`, apoi
+  `/dev/null`, iar verificarea se repetă chiar înainte de lansare.
+
+### Verificat după refactor
+
+- Calea embedded (contractul `XSCREENSAVER_WINDOW`) re-testată cu codul nou, într-o
+  fereastră părinte override-redirect de 640×400: potrivire de visual, `IsViewable`,
+  conținut propriu 29,8 % negri, 4,59 % din pixeli schimbați în 2 s (animație vie).
+
 ---
 
 ## Cum adaugi o versiune nouă
