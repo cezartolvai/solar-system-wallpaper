@@ -73,37 +73,50 @@ EOF
     [ "$WP_DELAY" != "0" ] && ENVV="${ENVV}SOLAR_DELAY=$WP_DELAY "
 
     # ---- settings file: keeps the launcher switch-free ---------------------
-    WP_SPEED=${SOLAR_WALLPAPER_SPEED:-0.5}
+    # RULE: never clobber an existing configuration.  A value given through the
+    # environment wins for this install; otherwise the value already in the file
+    # is kept; only a fresh install falls back to the built-in defaults.
     CFG_DIR="$HOME/.config/solar-screensaver"
+    CFG_FILE="$CFG_DIR/wallpaper.conf"
     mkdir -p "$CFG_DIR"
-    cat > "$CFG_DIR/wallpaper.conf" <<EOF
+    cfg_get() { [ -f "$CFG_FILE" ] && sed -n "s/^$1=//p" "$CFG_FILE" 2>/dev/null | tail -1; }
+    cfg_pick() {   # $1 = value from environment (may be empty), $2 = key, $3 = default
+        if [ -n "${1:-}" ]; then printf '%s' "$1"; return; fi
+        v=$(cfg_get "$2"); if [ -n "${v:-}" ]; then printf '%s' "$v"; else printf '%s' "$3"; fi
+    }
+    if [ -f "$CFG_FILE" ]; then
+        echo "==> keeping the existing wallpaper settings ($CFG_FILE)"
+    fi
+    WP_AREA=$(cfg_pick "${SOLAR_WALLPAPER_AREA:-}" AREA "")
+    WP_SPEED=$(cfg_pick "${SOLAR_WALLPAPER_SPEED:-}" SPEED 0.5)
+    WP_DELAY=$(cfg_pick "${SOLAR_WALLPAPER_DELAY:-}" DELAY 8)
+    WP_ORBITS=$(cfg_pick "${SOLAR_WALLPAPER_ORBITS:-}" ORBITS 0)
+    WP_LABELS=$(cfg_pick "${SOLAR_WALLPAPER_LABELS:-}" LABELS 0)
+    WP_STARS=$(cfg_pick "${SOLAR_WALLPAPER_STARS:-}" STARS 1)
+    WP_BELT=$(cfg_pick "${SOLAR_WALLPAPER_BELT:-}" BELT 1)
+    WP_FPS=$(cfg_pick "${SOLAR_WALLPAPER_FPS:-}" FPS 30)
+    WP_STACK=$(cfg_pick "${SOLAR_WALLPAPER_STACK:-}" STACK desktop)
+    cat > "$CFG_FILE" <<EOF
 # Solar System live wallpaper — read by solar-wallpaper.sh on every start.
 # Any value can be overridden for a single run with the matching SOLAR_* var.
+# AREA empty means "all monitors", which also covers the desktop icons;
+# set a rectangle such as 1920x1080+1920+0 to keep one screen free.
 AREA=$WP_AREA
 SPEED=$WP_SPEED
-STACK=desktop
-ORBITS=0
-LABELS=0
-STARS=1
-BELT=1
+STACK=$WP_STACK
+ORBITS=$WP_ORBITS
+LABELS=$WP_LABELS
+STARS=$WP_STARS
+BELT=$WP_BELT
 DELAY=$WP_DELAY
+FPS=$WP_FPS
 EOF
-    echo "==> wallpaper settings: $CFG_DIR/wallpaper.conf (area=${WP_AREA:-all})"
-
-    echo "==> installing the live-wallpaper autostart entry (enabled=$WP_FLAG${WP_AREA:+, area $WP_AREA})"
-    mkdir -p "$AUTOSTART_DIR"
-    cat > "$AUTOSTART_FILE" <<EOF
-[Desktop Entry]
-Type=Application
-Name=Solar System wallpaper
-Comment=Animated solar system as a live desktop background
-Exec=$DEST/solar-wallpaper.sh
-TryExec=$DEST/solar-wallpaper.sh
-Terminal=false
-NoDisplay=false
-X-GNOME-Autostart-enabled=$WP_FLAG
-X-MATE-Autostart-enabled=$WP_FLAG
-EOF
+    echo "==> wallpaper settings: $CFG_FILE (area=${WP_AREA:-ALL monitors})"
+    if [ -z "$WP_AREA" ]; then
+        echo "    note: with no AREA the canvas covers every monitor, including"
+        echo "          any desktop icons.  Set one, e.g.:"
+        echo "          SOLAR_WALLPAPER_AREA=\"1920x1080+1920+0\" ./install-solar-screensaver.sh install"
+    fi
 
     # The daemon (unlike the preferences dialog) loads its theme list from the
     # system data dirs at startup, so a user-level entry can end up visible in

@@ -65,6 +65,8 @@ apoi rulezi installerul.
 
 ```
 AREA=1920x1080+1920+0      # monitorul 2 (toate iconițele sunt pe monitorul 1)
+                           # ATENȚIE: AREA gol = toate monitoarele = acoperă și iconițele
+                           # (installerul NU mai suprascrie o configurație existentă)
 SPEED=0.5                  # zile/secundă — derivă lentă
 STACK=desktop              # sub ferestrele normale, deasupra fundalului caja
 ORBITS=0                   # fără linii orbitale

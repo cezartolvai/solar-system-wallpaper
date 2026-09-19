@@ -100,6 +100,17 @@ lansat tema. Rețeta de depanare (cu debug-ul daemonului în timpul activării) 
   deschise, `wmctrl` funcționează din nou. Lecția e deja în secțiunea 4: testele nu
   creează ferestre gestionate de WM.
 
+## 2026-09-19 — v1.0.3
+
+- **Reparat: installerul suprascria configurația existentă.** Rulat fără
+  `SOLAR_WALLPAPER_AREA`, scria `AREA=` (gol) în `wallpaper.conf`, adică „toate
+  monitoarele" — iar fundalul a acoperit iconițele de pe monitorul 1. Acum valorile
+  din mediu câștigă doar dacă sunt date; altfel se păstrează ce era în fișier; doar
+  o instalare nouă folosește valorile implicite. Verificat în trei scenarii
+  (instalare nouă / re-instalare fără variabile / re-instalare cu variabilă).
+- `verify.sh` avertizează acum dacă `AREA` e gol (fundal peste tot desktopul).
+- Lecție pentru viitor: installerul nu are voie să distrugă starea utilizatorului.
+
 ---
 
 ## Cum adaugi o versiune nouă

@@ -89,6 +89,13 @@ if [ -x "$DIR/solar-wallpaper.sh" ]; then
         *"orbits      : 0"*) ok "orbitele sunt oprite (fundal curat)" ;;
         *) info "orbitele sunt pornite (poate ai setat ORBITS=1)" ;;
     esac
+    case "$out" in
+        *"area        : <all monitors>"*)
+            bad "AREA e gol: fundalul acoperă TOATE monitoarele, inclusiv iconițele"
+            info "  remediază: pune AREA=1920x1080+1920+0 în ~/.config/solar-screensaver/wallpaper.conf"
+            info "  sau rulează installerul cu SOLAR_WALLPAPER_AREA=\"1920x1080+1920+0\"" ;;
+        *) ok "fundalul e limitat la o zonă (nu acoperă tot desktopul)" ;;
+    esac
 fi
 
 # ---------------------------------------------------------------- 5. randare
