@@ -20,7 +20,11 @@ OUT="$PROJ/diag"
 mkdir -p "$OUT" 2>/dev/null || OUT=/tmp
 
 # tema noastră + două teme stock (cu ambele forme de ID)
-CANDIDATES="screensavers-solar-system solar-system screensavers-abstractile abstractile"
+# Fără argumente testează toate variantele (~40 s). Cu argumente, doar acelea
+# (ex.: ./diagnose-screensaver.sh screensavers-solar-system  → ~10 s).
+if [ "$#" -gt 0 ]; then CANDIDATES="$*"; else
+    CANDIDATES="screensavers-solar-system solar-system screensavers-abstractile abstractile"
+fi
 
 ORIG_THEMES=$(gsettings get org.mate.screensaver themes 2>/dev/null || echo "[]")
 ORIG_LOCK=$(gsettings get org.mate.screensaver lock-enabled 2>/dev/null || echo "true")
@@ -74,6 +78,9 @@ for id in $CANDIDATES; do
         *) verdict="?" ;;
     esac
     printf '%-28s %-46s %s linii  %s\n' "$id" "$cmd" "$got" "$verdict"
+    if [ "$got" -gt 0 ]; then
+        tail -n "$got" "$LOG" | sed 's/^/        jurnal: /'
+    fi
 
     mate-screensaver-command --exit >/dev/null 2>&1
     sleep 1

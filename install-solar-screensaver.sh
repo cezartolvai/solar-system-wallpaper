@@ -32,6 +32,31 @@ do_install() {
     chmod 755 "$DEST/solar-webkit.py" "$DEST/solar-saver.sh" "$DEST/solar-wallpaper.sh"
     chmod 644 "$DEST/solar-system-3d.html"
 
+    # ---- where the theme's Exec points ------------------------------------
+    # mate-screensaver refuses an Exec that touches the user's home directory
+    # (measured: identical entries resolving to '/usr/libexec/...' work, anything
+    # with $HOME stays NULL), so for a working screensaver the runtime has to
+    # live in a system path.
+    RUNTIME="$DEST"
+    EXEC="$DEST/solar-saver.sh"
+    if [ "${SOLAR_SYSTEM_WIDE:-0}" = "1" ]; then
+        SYS_RUNTIME=/usr/local/lib/solar-screensaver
+        echo "==> installing the runtime system-wide in $SYS_RUNTIME (needs sudo)"
+        if sudo mkdir -p "$SYS_RUNTIME" && \
+           sudo cp -f "$SRC/solar-saver.sh" "$SRC/solar-webkit.py" "$SRC/solar-system-3d.html" \
+                      "$SRC/solar-wallpaper.sh" "$SYS_RUNTIME/" && \
+           sudo chmod 755 "$SYS_RUNTIME/solar-saver.sh" "$SYS_RUNTIME/solar-webkit.py" \
+                         "$SYS_RUNTIME/solar-wallpaper.sh" && \
+           sudo chmod 644 "$SYS_RUNTIME/solar-system-3d.html"; then
+            RUNTIME="$SYS_RUNTIME"
+            EXEC="$SYS_RUNTIME/solar-saver.sh"
+            echo "    ok: the theme will run from $EXEC"
+        else
+            echo "    WARNING: sudo failed; the theme keeps pointing into \$HOME and" >&2
+            echo "             mate-screensaver will refuse to launch it." >&2
+        fi
+    fi
+
     echo "==> registering the screensaver theme"
     mkdir -p "$THEME_DIR"
     cat > "$THEME_FILE" <<EOF
@@ -41,8 +66,8 @@ Comment=Interactive 3D solar system: real orbital elements, computed illuminatio
 # --root mirrors what the working stock themes receive; our launcher accepts
 # and ignores it (it draws into the window the daemon gives us, or takes the
 # screen itself when none is given)
-Exec=$DEST/solar-saver.sh --root
-TryExec=$DEST/solar-saver.sh
+Exec=$EXEC --root
+TryExec=$EXEC
 StartupNotify=false
 Terminal=false
 Type=Application
@@ -122,12 +147,12 @@ EOF
     # system data dirs at startup, so a user-level entry can end up visible in
     # the preferences but never launched.  SOLAR_SYSTEM_WIDE=1 copies it too.
     if [ "${SOLAR_SYSTEM_WIDE:-0}" = "1" ]; then
-        echo "==> copying the theme into $SYS_THEME_DIR (needs sudo)"
+        echo "==> copying the theme entries into $SYS_THEME_DIR"
         if sudo cp -f "$THEME_FILE" "$THEME_DIR/screensavers-solar-system.desktop" "$SYS_THEME_DIR/"; then
             echo "    ok: $SYS_THEME_DIR/{solar-system,screensavers-solar-system}.desktop"
         else
             echo "    FAILED - copy it by hand:" >&2
-            echo "      sudo cp $THEME_FILE $SYS_THEME_DIR/" >&2
+            echo "      sudo cp $THEME_FILE $THEME_DIR/screensavers-solar-system.desktop $SYS_THEME_DIR/" >&2
         fi
     else
         echo "    note: run with SOLAR_SYSTEM_WIDE=1 to also install the theme"

@@ -45,7 +45,15 @@ pkill -f solar-webkit.py                      # oprește-l
 gazdă, are handler X non-fatal care loghează în loc să moară, iar rulat manual
 (`solar-saver.sh`) pornește corect fullscreen.
 
-**Neverificat / nu funcționează pe acest sistem:** pe MATE 1.26.2, `mate-screensaver`
+**Instalare necesară pentru screensaver:** `mate-screensaver` refuză un `Exec` care
+atinge `$HOME` (comanda temei iese `NULL`), deci tema are nevoie de runtime în sistem:
+
+```sh
+SOLAR_SYSTEM_WIDE=1 ./install-solar-screensaver.sh install     # sudo, o singură dată
+mate-screensaver-command --exit ; nohup mate-screensaver >/dev/null 2>&1 &
+```
+
+**Istoric / de verificat:** pe MATE 1.26.2, `mate-screensaver`
 **nu lansează tema** la activare — jurnalul `~/.cache/solar-screensaver.log` rămâne gol,
 deși tema e instalată system-wide, are alias pentru ID-ul din `gsettings` și `--root`
 în `Exec`. Rezolvarea temelor în daemon se face la activare, deci diagnosticul cere
