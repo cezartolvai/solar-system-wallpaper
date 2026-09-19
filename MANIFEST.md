@@ -16,7 +16,7 @@ O simulare 3D interactivă a sistemului solar, scrisă într-un **singur fișier
 | rol | cum se comportă |
 |---|---|
 | **fundal live** (folosit acum) | fereastră în stratul `desktop`, lipită sub ferestrele normale, click-through; desenează sistemul solar pe monitorul 2 |
-| **screensaver** ⚠️ *experimental* | temă pentru `mate-screensaver`; desenează în fereastra dată de daemon (`XSCREENSAVER_WINDOW`) sau fullscreen dacă rulează manual. Pe MATE 1.26.2 daemonul nu o lansează încă — vezi secțiunea 7b |
+| **screensaver** | temă pentru `mate-screensaver`; desenează în fereastra dată de daemon (`XSCREENSAVER_WINDOW`) sau fullscreen dacă rulează manual. Necesită runtime-ul în `/usr/libexec/mate-screensaver` — regula e în secțiunea 7b |
 
 ---
 
@@ -136,35 +136,51 @@ sudo rm -f /usr/share/applications/screensavers/solar-system.desktop \
 
 ---
 
-## 7b. Depanare screensaver (experimental)
+## 7b. Screensaver: regula oficială (dovedită din sursă)
 
-Pe acest sistem tema **nu este lansată** de daemon la activare. Rețeta care scoate la
-iveală cauza (are nevoie de ~10 secunde de ecran blocat, dacă nu dezactivezi întâi
-blocarea):
+`mate-screensaver` lansează o temă **doar dacă programul din `Exec` se află într-unul
+din directoarele lui de engine**. Din `src/gs-theme-manager.c` (versiunea 1.26):
 
-```sh
-# 1. oprește daemonul normal (altfel --debug refuză: "screensaver already running")
-mate-screensaver-command --exit ; sleep 1
+```c
+static const char *known_engine_locations[] = {
+        SAVERDIR,                     /* = pkglibexecdir = /usr/libexec/mate-screensaver */
+        XSCREENSAVER_HACK_DIR,
+        LIBEXECDIR "/xscreensaver",   /* /usr/libexec/xscreensaver */
+        "/usr/libexec/xscreensaver",
+        "/usr/lib/xscreensaver",
+        NULL
+};
 
-# 2. opțional: fără blocare imediată, ca să vezi animația la test
-gsettings set org.mate.screensaver lock-enabled false
-
-# 3. pornește daemonul cu debug, în prim-plan, într-un terminal
-mate-screensaver --no-daemon --debug 2>&1 | tee /tmp/ms-debug.log
-
-# 4. în ALT terminal: activează și verifică jurnalul nostru
-mate-screensaver-command -a ; sleep 4 ; tail -12 ~/.cache/solar-screensaver.log
-
-# 5. revino la normal
-gsettings set org.mate.screensaver lock-enabled true
-nohup mate-screensaver >/dev/null 2>&1 &
+gs_theme_info_get_exec (GSThemeInfo *info) {
+        if (check_command (info->exec))  exec = info->exec;
+        else                             exec = NULL;     /* ← „No command set for job" */
+}
 ```
 
-Ce se caută în `/tmp/ms-debug.log`: cum rezolvă daemonul ID-ul temei
-(`screensavers-solar-system`), dacă apare mesajul
-„*%s does not appear to be a valid screensaver theme*", și dacă încearcă vreun
-`g_spawn` al comenzii din `Exec`. În jurnalul nostru ar trebui să apară
-`start … XSCREENSAVER_WINDOW=0x…` plus liniile `embed:` cu depth/visual/map.
+`check_command()` ia primul cuvânt din `Exec` și îl validează cu `find_command()`, care
+compară **directorul** lui cu lista de mai sus (și cere `G_FILE_TEST_IS_EXECUTABLE`).
+De aceea, măsurat pe acest sistem:
+
+| Exec | Rezultat |
+|---|---|
+| `/usr/libexec/xscreensaver/abstractile --root` | ✅ comandă rezolvată, tema pornește |
+| `$HOME/.../solar-saver.sh --root` | ✗ `NULL` (director neacceptat) |
+| `/usr/bin/env $HOME/.../solar-saver.sh` | ✗ `NULL` (primul cuvânt e în `/usr/bin`) |
+| `/usr/local/lib/solar-screensaver/...sh` | ✗ `NULL` (director neacceptat) |
+
+**Prin urmare instalarea corectă este:**
+
+```sh
+SOLAR_SYSTEM_WIDE=1 ./install-solar-screensaver.sh install
+```
+
+care copiază runtime-ul în `/usr/libexec/mate-screensaver/` și scrie tema cu
+`Exec=/usr/libexec/mate-screensaver/solar-saver.sh --root`. `verify.sh` verifică acum
+automat această regulă (secțiunea 3b).
+
+Notă: `/usr/libexec/mate-screensaver/` aparține pachetului `mate-screensaver`; o
+actualizare de pachet poate șterge fișierele noastre de acolo — se rezolvă rulând din
+nou installerul.
 
 ## 8. Capcane cunoscute (ca să nu le redescoperi peste 10 ani)
 

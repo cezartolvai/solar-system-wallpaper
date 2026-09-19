@@ -8,9 +8,9 @@
 > Real Keplerian orbital elements, physically-based illumination, no external assets.
 > Docs are in Romanian; the code and its comments are in English.
 >
-> **Status:** the live-wallpaper role is stable and in daily use; the MATE screensaver
-> theme is **experimental** — the daemon does not launch it on MATE 1.26.2 yet (see the
-> status section below and `MANIFEST.md`).
+> **Status:** both roles work. The screensaver needs the runtime installed inside
+> `mate-screensaver`'s engine directory (`/usr/libexec/mate-screensaver`) — the daemon
+> only launches themes whose `Exec` lives there (see `MANIFEST.md` §7b).
 
 Simulare 3D a sistemului solar într-un singur fișier HTML (Canvas 2D, offline, fără
 librării), rulată de o gazdă nativă GTK/WebKit fie ca **temă de screensaver**, fie ca
@@ -36,7 +36,7 @@ pkill -f solar-webkit.py                      # oprește-l
 |---|---|
 | simularea `solar-system-3d.html` | ✅ **funcțională** — orbite kepleriene reale, iluminare calculată, inele, centură de asteroizi; 60 fps la 1366×768 și 390×844; zero erori JS |
 | fundal live `solar-wallpaper.sh` | ✅ **stabil, în uz zilnic** — monitorul 2, fără orbite/etichete, pornire automată la login |
-| screensaver `solar-saver.sh` + tema MATE | ⚠️ **experimental (WIP)** — vezi mai jos |
+| screensaver `solar-saver.sh` + tema MATE | ✅ **funcțional** — necesită runtime-ul în directorul de teme al daemonului (vezi mai jos) |
 
 ### Screensaver: ce e verificat și ce nu
 
@@ -45,15 +45,16 @@ pkill -f solar-webkit.py                      # oprește-l
 gazdă, are handler X non-fatal care loghează în loc să moară, iar rulat manual
 (`solar-saver.sh`) pornește corect fullscreen.
 
-**Instalare necesară pentru screensaver:** `mate-screensaver` refuză un `Exec` care
-atinge `$HOME` (comanda temei iese `NULL`), deci tema are nevoie de runtime în sistem:
+**Instalare pentru screensaver:** daemonul lansează doar teme al căror `Exec` se află în
+directorul lui de engine (`/usr/libexec/mate-screensaver`) — regula e citată din sursa
+`mate-screensaver` în `MANIFEST.md` §7b:
 
 ```sh
 SOLAR_SYSTEM_WIDE=1 ./install-solar-screensaver.sh install     # sudo, o singură dată
 mate-screensaver-command --exit ; nohup mate-screensaver >/dev/null 2>&1 &
 ```
 
-**Istoric / de verificat:** pe MATE 1.26.2, `mate-screensaver`
+**Istoric:** pe MATE 1.26.2, `mate-screensaver`
 **nu lansează tema** la activare — jurnalul `~/.cache/solar-screensaver.log` rămâne gol,
 deși tema e instalată system-wide, are alias pentru ID-ul din `gsettings` și `--root`
 în `Exec`. Rezolvarea temelor în daemon se face la activare, deci diagnosticul cere

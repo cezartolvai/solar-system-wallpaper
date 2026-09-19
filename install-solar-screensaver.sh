@@ -40,20 +40,25 @@ do_install() {
     RUNTIME="$DEST"
     EXEC="$DEST/solar-saver.sh"
     if [ "${SOLAR_SYSTEM_WIDE:-0}" = "1" ]; then
-        SYS_RUNTIME=/usr/local/lib/solar-screensaver
-        echo "==> installing the runtime system-wide in $SYS_RUNTIME (needs sudo)"
+        # mate-screensaver only launches a theme whose Exec program lives in one
+        # of its known engine directories (src/gs-theme-manager.c, function
+        # find_command): SAVERDIR = /usr/libexec/mate-screensaver,
+        # /usr/libexec/xscreensaver, /usr/lib/xscreensaver.  Anything else —
+        # $HOME, /usr/local, even /usr/bin/env — makes check_command() fail and
+        # gs_theme_info_get_exec() return NULL, so nothing is ever launched.
+        SYS_RUNTIME=/usr/libexec/mate-screensaver
+        echo "==> installing the runtime into the theme directory $SYS_RUNTIME (needs sudo)"
         if sudo mkdir -p "$SYS_RUNTIME" && \
            sudo cp -f "$SRC/solar-saver.sh" "$SRC/solar-webkit.py" "$SRC/solar-system-3d.html" \
-                      "$SRC/solar-wallpaper.sh" "$SYS_RUNTIME/" && \
-           sudo chmod 755 "$SYS_RUNTIME/solar-saver.sh" "$SYS_RUNTIME/solar-webkit.py" \
-                         "$SYS_RUNTIME/solar-wallpaper.sh" && \
+                      "$SYS_RUNTIME/" && \
+           sudo chmod 755 "$SYS_RUNTIME/solar-saver.sh" "$SYS_RUNTIME/solar-webkit.py" && \
            sudo chmod 644 "$SYS_RUNTIME/solar-system-3d.html"; then
             RUNTIME="$SYS_RUNTIME"
             EXEC="$SYS_RUNTIME/solar-saver.sh"
-            echo "    ok: the theme will run from $EXEC"
+            echo "    ok: theme Exec = $EXEC --root   (accepted by the daemon)"
         else
-            echo "    WARNING: sudo failed; the theme keeps pointing into \$HOME and" >&2
-            echo "             mate-screensaver will refuse to launch it." >&2
+            echo "    WARNING: sudo failed; the theme keeps an Exec outside the" >&2
+            echo "             engine directories and mate-screensaver will skip it." >&2
         fi
     fi
 

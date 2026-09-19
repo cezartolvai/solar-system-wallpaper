@@ -80,6 +80,29 @@ if [ -x "$DIR/install-solar-screensaver.sh" ]; then
     fi
 fi
 
+# ------------------------------------------------- 3b. tema de screensaver
+head_ "3b. Tema de screensaver (regula din sursa mate-screensaver)"
+THEME="$HOME/.local/share/applications/screensavers/solar-system.desktop"
+if [ -f "$THEME" ]; then
+    exec_line=$(sed -n 's/^Exec=//p' "$THEME" | head -1)
+    prog=$(printf '%s' "$exec_line" | awk '{print $1}')
+    dir=$(dirname "$prog")
+    info "Exec: $exec_line"
+    case "$dir" in
+        /usr/libexec/mate-screensaver|/usr/libexec/xscreensaver|/usr/lib/xscreensaver)
+            if [ -x "$prog" ]; then
+                ok "programul e într-un director acceptat de daemon și e executabil"
+            else
+                bad "$prog nu e executabil"
+            fi ;;
+        *)
+            bad "Exec-ul NU e într-un director acceptat de daemon: $dir"
+            info "  mate-screensaver (src/gs-theme-manager.c) acceptă doar:" 
+            info "    /usr/libexec/mate-screensaver (SAVERDIR), /usr/libexec/xscreensaver, /usr/lib/xscreensaver"
+            info "  remediază: SOLAR_SYSTEM_WIDE=1 ./install-solar-screensaver.sh install" ;;
+    esac
+fi
+
 # ---------------------------------------------------------------- 4. config
 head_ "4. Configurația fundalului"
 if [ -x "$DIR/solar-wallpaper.sh" ]; then
