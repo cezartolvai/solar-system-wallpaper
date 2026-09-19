@@ -166,18 +166,24 @@ git tag -l                        # versiuni
 git bundle verify solar-system-v1.0.0.bundle    # verifică arhiva de backup
 ```
 
-Publicare pe GitHub (o singură dată):
+**Publicat:** <https://github.com/cezartolvai/solar-system-wallpaper> (public, branch
+`main`, tag `v1.0.0`, primul push 2026-09-19). Remote-ul `origin` e deja configurat.
+
+Pentru versiuni viitoare:
 
 ```sh
-# 1. creează repo gol pe github.com (fără README/.gitignore/licență — există deja aici)
-# 2. leagă remote-ul și împinge
-git remote add origin git@github.com:<utilizator>/<repo>.git
-git push -u origin main --tags
+git add -A && git commit -m "v1.0.1 — ..."
+git tag -a v1.0.1 -m "v1.0.1"
+git push && git push --tags
 ```
 
-Autentificare: cheie SSH în contul GitHub (Settings → SSH keys) sau token HTTPS, ori
-`sudo apt install gh && gh auth login` apoi
+Autentificare: cheie SSH în contul GitHub (Settings → SSH keys, tip *Authentication Key*;
+fingerprint-ul cheii de pe această mașină este `SHA256:glIshkrJvgLMD0qP+za0VweT+3dbDf9hwE+Tw97yyjY`)
+sau token HTTPS, ori `sudo apt install gh && gh auth login` apoi
 `gh repo create <repo> --public --source . --push`.
+
+Arhivele locale (`*.bundle`, `*.tar.gz`) **nu** urcă pe GitHub (vezi `.gitignore`);
+`git bundle` rămâne metoda de backup într-un singur fișier.
 
 Fișierele `*.bundle` și `*.tar.gz` din folder sunt excluse din repo (vezi `.gitignore`) —
 sunt arhive locale de backup, nu parte din proiect.
