@@ -227,6 +227,8 @@ class SolarHost(object):
                 query += "&tour=0"
             if args.speed is not None:
                 query += "&speed=%s" % args.speed
+        if args.fps is not None:
+            query += ("&" if "?" in query else "?") + "fps=%s" % args.fps
         # no-* switches are forwarded to the page (it has no UI in these modes)
         for flag, name in (("no_orbits", "orbits"), ("no_labels", "labels"),
                            ("no_stars", "stars"), ("no_belt", "belt")):
@@ -825,6 +827,9 @@ def main():
     p.add_argument("--query", default=None,
                    help="query string for the page; pass \"\" for the normal interactive UI")
     p.add_argument("--delay", type=float, default=0.0, help="wait before loading (s)")
+    p.add_argument("--fps", type=float, default=None,
+                   help="cap the drawing to N frames/s (0 = uncapped); the "
+                        "simulation keeps advancing at the real speed")
     p.add_argument("--debug", action="store_true")
     for _flag, _help in (("--no-orbits", "hide orbital paths"),
                          ("--no-labels", "hide body name labels"),

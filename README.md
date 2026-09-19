@@ -129,6 +129,7 @@ Pagina acceptă parametri în URL:
 | `&tour=0` | fără tur |
 | `&speed=6` | viteză inițială în zile/secundă (poate fi negativă) |
 | `&quality=2` | pornire la o calitate fixă (0 = maximă … 3 = redusă) |
+| `&fps=30` | limitează desenarea la 30 de cadre/s; simularea continuă normal. Fundalul live folosește 30 fps implicit (≈ jumătate din CPU față de 60); `FPS=0` în config = nelimitat |
 
 Gazda are propriile opțiuni:
 

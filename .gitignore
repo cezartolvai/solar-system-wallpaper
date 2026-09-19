@@ -3,3 +3,4 @@ __pycache__/
 *.bundle
 *.tar.gz
 !docs/preview.png
+diag/

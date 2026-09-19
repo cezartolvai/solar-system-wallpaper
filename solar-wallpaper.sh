@@ -36,6 +36,7 @@ LABELS=${SOLAR_LABELS:-$(cfg LABELS)}
 STARS=${SOLAR_STARS:-$(cfg STARS)}
 BELT=${SOLAR_BELT:-$(cfg BELT)}
 DELAY=${SOLAR_DELAY:-$(cfg DELAY)}
+FPS=${SOLAR_FPS:-$(cfg FPS)}
 SPAN=${SOLAR_SPAN:-1}
 
 # built-in defaults (a wallpaper is calmer and cleaner than the interactive view)
@@ -46,7 +47,11 @@ LABELS=${LABELS:-0}
 STARS=${STARS:-1}
 BELT=${BELT:-1}
 DELAY=${DELAY:-0}
+# 30 fps is plenty for a slowly drifting wallpaper and costs about half the CPU
+# of 60; set FPS=0 in wallpaper.conf for uncapped.
+FPS=${FPS:-30}
 EXTRA=""
+[ -n "$FPS" ] && [ "$FPS" != "0" ] && EXTRA="$EXTRA --fps $FPS"
 [ "$ORBITS" = "0" ] && EXTRA="$EXTRA --no-orbits"
 [ "$LABELS" = "0" ] && EXTRA="$EXTRA --no-labels"
 [ "$STARS"  = "0" ] && EXTRA="$EXTRA --no-stars"
@@ -66,6 +71,7 @@ if [ "${1:-}" = "--print" ] || [ -n "${SOLAR_PRINT:-}" ]; then
     echo "stars       : $STARS"
     echo "belt        : $BELT"
     echo "start delay : ${DELAY}s"
+    echo "frame cap   : ${FPS:-0} fps$([ "${FPS:-0}" = "0" ] && echo ' (nelimitat)')"
     echo "command     : python3 $HOST --mode wallpaper --stack $STACK$([ -n "$AREA" ] && echo " --area $AREA") --saver drift --speed $SPEED$EXTRA --url $PAGE"
     exit 0
 fi

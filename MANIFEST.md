@@ -74,6 +74,11 @@ BELT=1
 DELAY=8                    # la login, așteaptă desktopul înainte de a apărea
 ```
 
+Consum măsurat (monitorul 2, 1920×1080, WebKit cu accelerare hardware): ~29 % dintr-un
+nucleu la 60 fps nelimitat. Lansatorul fundalului limitează desenarea la **30 fps**
+(`?fps=30`), ceea ce reduce aproximativ la jumătate costul; se schimbă cu `FPS=` în
+`wallpaper.conf` sau `SOLAR_FPS=` la o rulare (`FPS=0` = nelimitat).
+
 Setări MATE relevante:
 
 ```sh

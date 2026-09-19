@@ -1399,6 +1399,13 @@
     var m = new RegExp('[?&]' + name + '=([01])', 'i').exec(QS);
     return m ? m[1] === '1' : null;
   }
+  /* Optional frame-rate cap: ?fps=30 draws at most 30 frames/s while the
+     simulation keeps advancing with the real dt.  A live wallpaper does not
+     need 60 fps and this roughly halves its CPU cost.  0/absent = uncapped. */
+  var FPS_CAP = parseFloat((/[?&]fps=(\d+(?:\.\d+)?)/i.exec(QS) || [])[1]);
+  var MIN_FRAME_MS = (isFinite(FPS_CAP) && FPS_CAP > 0) ? 1000 / FPS_CAP : 0;
+  var lastDrawMs = 0;
+
   var P_ORBITS = flagParam('orbits');
   var P_LABELS = flagParam('labels');
   var P_STARS = flagParam('stars');
@@ -2274,6 +2281,13 @@
       }
     }
     updateCameraBasis();
+
+    // ---- frame-rate cap: keep simulating, skip this frame's drawing
+    if (MIN_FRAME_MS > 0 && nowMs - lastDrawMs < MIN_FRAME_MS) {
+      updateHud(dt);
+      return;
+    }
+    lastDrawMs = nowMs;
 
     // ---- build + draw
     // Orbit paths are drawn before the depth-sorted bodies, so a path is

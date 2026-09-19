@@ -87,6 +87,19 @@ lansat tema. Rețeta de depanare (cu debug-ul daemonului în timpul activării) 
   `marco --replace &`. Lecție: testele nu trebuie să creeze ferestre gestionate de WM
   (folosește opacitate 0 sau `Gtk.OffscreenWindow`).
 
+## 2026-09-19 — v1.0.2
+
+- **Limita de cadre pentru fundal** (`?fps=30` / `--fps` / `FPS=` în `wallpaper.conf`):
+  simularea continuă cu dt real, dar desenarea se rarefiază. Verificat comportamental:
+  fără limită două capturi la 1 s distanță diferă în 2,09 % din pixeli, cu `fps=0.25`
+  diferă în 0,00 % (nu se desenează). Motiv: fundalul consuma ~29 % dintr-un nucleu la
+  60 fps non-stop.
+- **Curățată fereastra-fantomă din Marco** (`0x4800019`, rămasă de la un test de-al meu
+  care a creat o fereastră gestionată de WM): intrarea din `_NET_CLIENT_LIST` a fost
+  eliminată cu `marco --replace &` — WM-ul își reconstruiește starea, aplicațiile rămân
+  deschise, `wmctrl` funcționează din nou. Lecția e deja în secțiunea 4: testele nu
+  creează ferestre gestionate de WM.
+
 ---
 
 ## Cum adaugi o versiune nouă
