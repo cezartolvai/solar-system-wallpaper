@@ -16,7 +16,7 @@ O simulare 3D interactivă a sistemului solar, scrisă într-un **singur fișier
 | rol | cum se comportă |
 |---|---|
 | **fundal live** (folosit acum) | fereastră în stratul `desktop`, lipită sub ferestrele normale, click-through; desenează sistemul solar pe monitorul 2 |
-| **screensaver** | temă pentru `mate-screensaver`; desenează în fereastra dată de daemon (`XSCREENSAVER_WINDOW`) sau fullscreen dacă rulează manual |
+| **screensaver** ⚠️ *experimental* | temă pentru `mate-screensaver`; desenează în fereastra dată de daemon (`XSCREENSAVER_WINDOW`) sau fullscreen dacă rulează manual. Pe MATE 1.26.2 daemonul nu o lansează încă — vezi secțiunea 7b |
 
 ---
 
@@ -128,6 +128,36 @@ sudo rm -f /usr/share/applications/screensavers/solar-system.desktop \
 ```
 
 ---
+
+## 7b. Depanare screensaver (experimental)
+
+Pe acest sistem tema **nu este lansată** de daemon la activare. Rețeta care scoate la
+iveală cauza (are nevoie de ~10 secunde de ecran blocat, dacă nu dezactivezi întâi
+blocarea):
+
+```sh
+# 1. oprește daemonul normal (altfel --debug refuză: "screensaver already running")
+mate-screensaver-command --exit ; sleep 1
+
+# 2. opțional: fără blocare imediată, ca să vezi animația la test
+gsettings set org.mate.screensaver lock-enabled false
+
+# 3. pornește daemonul cu debug, în prim-plan, într-un terminal
+mate-screensaver --no-daemon --debug 2>&1 | tee /tmp/ms-debug.log
+
+# 4. în ALT terminal: activează și verifică jurnalul nostru
+mate-screensaver-command -a ; sleep 4 ; tail -12 ~/.cache/solar-screensaver.log
+
+# 5. revino la normal
+gsettings set org.mate.screensaver lock-enabled true
+nohup mate-screensaver >/dev/null 2>&1 &
+```
+
+Ce se caută în `/tmp/ms-debug.log`: cum rezolvă daemonul ID-ul temei
+(`screensavers-solar-system`), dacă apare mesajul
+„*%s does not appear to be a valid screensaver theme*", și dacă încearcă vreun
+`g_spawn` al comenzii din `Exec`. În jurnalul nostru ar trebui să apară
+`start … XSCREENSAVER_WINDOW=0x…` plus liniile `embed:` cu depth/visual/map.
 
 ## 8. Capcane cunoscute (ca să nu le redescoperi peste 10 ani)
 

@@ -57,6 +57,14 @@ așteaptă ca tema să deseneze în acea fereastră (contractul xscreensaver, g�
 **Concluzie:** screensaver-ul rămâne o cale secundară, cu capcane de integrare;
 fundalul live este calea folosită.
 
+**Stare consemnată (2026-09-19):** screensaver-ul este marcat **experimental / WIP** în
+README și MANIFEST. Rămâne în repo pentru că implementarea e reală și verificată izolat
+(contractul `XSCREENSAVER_WINDOW`, reparentare X11, potrivire de visual, handler X
+non-fatal, fullscreen la rulare manuală), dar integrarea cu daemonul nu e validată:
+`mate-screensaver` 1.26.2 își rezolvă temele la activare, iar pe acest sistem nu a
+lansat tema. Rețeta de depanare (cu debug-ul daemonului în timpul activării) e în
+`MANIFEST.md`, secțiunea 7b — de continuat acolo dacă e vreodată nevoie.
+
 ### 3. Rolul de fundal live (calea aleasă)
 
 - Fereastră în stratul `desktop`, `set_pass_through(True)` (click-through), fără focus,

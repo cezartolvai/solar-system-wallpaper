@@ -7,6 +7,10 @@
 > can run as a **live desktop wallpaper** or as a **MATE screensaver theme**.
 > Real Keplerian orbital elements, physically-based illumination, no external assets.
 > Docs are in Romanian; the code and its comments are in English.
+>
+> **Status:** the live-wallpaper role is stable and in daily use; the MATE screensaver
+> theme is **experimental** — the daemon does not launch it on MATE 1.26.2 yet (see the
+> status section below and `MANIFEST.md`).
 
 Simulare 3D a sistemului solar într-un singur fișier HTML (Canvas 2D, offline, fără
 librării), rulată de o gazdă nativă GTK/WebKit fie ca **temă de screensaver**, fie ca
@@ -25,6 +29,31 @@ librării), rulată de o gazdă nativă GTK/WebKit fie ca **temă de screensaver
 pkill -f solar-webkit.py                      # oprește-l
 ./verify.sh                                   # verifică tot
 ```
+
+## Stare (2026-09-19)
+
+| componentă | stare |
+|---|---|
+| simularea `solar-system-3d.html` | ✅ **funcțională** — orbite kepleriene reale, iluminare calculată, inele, centură de asteroizi; 60 fps la 1366×768 și 390×844; zero erori JS |
+| fundal live `solar-wallpaper.sh` | ✅ **stabil, în uz zilnic** — monitorul 2, fără orbite/etichete, pornire automată la login |
+| screensaver `solar-saver.sh` + tema MATE | ⚠️ **experimental (WIP)** — vezi mai jos |
+
+### Screensaver: ce e verificat și ce nu
+
+**Verificat:** gazda desenează în fereastra dată de daemon prin contractul
+`XSCREENSAVER_WINDOW` (reparentare X11, nu `Gtk.Plug`), potrivește visualul ferestrei
+gazdă, are handler X non-fatal care loghează în loc să moară, iar rulat manual
+(`solar-saver.sh`) pornește corect fullscreen.
+
+**Neverificat / nu funcționează pe acest sistem:** pe MATE 1.26.2, `mate-screensaver`
+**nu lansează tema** la activare — jurnalul `~/.cache/solar-screensaver.log` rămâne gol,
+deși tema e instalată system-wide, are alias pentru ID-ul din `gsettings` și `--root`
+în `Exec`. Rezolvarea temelor în daemon se face la activare, deci diagnosticul cere
+capturarea ieșirii de debug **în timpul activării** (rețetă în `MANIFEST.md`,
+secțiunea „Depanare screensaver").
+
+Până atunci: **folosește fundalul live**; screensaver-ul rămâne în repo ca punct de
+plecare documentat, nu ca funcție gata de folosit.
 
 Configurația fundalului: `~/.config/solar-screensaver/wallpaper.conf`
 (arie, viteză, straturi, orbite, etichete) — implicit pe monitorul 2, fără orbite și
