@@ -84,16 +84,17 @@ DEBUG_ARG="--debug"
 
 # One complete copy of the scene per monitor: the host builds one window per
 # monitor by itself when neither --area nor --monitor pins a single rectangle.
-# Orbits and labels are asked for explicitly (the page defaults to on, but a
-# screensaver has no UI to switch them back on).  The frame rate is capped so
-# that N monitors cost N x 30 fps instead of N x 60: the simulation keeps
-# advancing with the real elapsed time, only the drawing is throttled.
+# Labels are asked for explicitly (the page defaults to on, but a screensaver
+# has no UI to switch them back on); orbital paths are switched OFF, they read
+# as clutter on a wall-sized screen.  The frame rate is capped so that N
+# monitors cost N x 30 fps instead of N x 60: the simulation keeps advancing
+# with the real elapsed time, only the drawing is throttled.
 SAVER_FPS=${SOLAR_SAVER_FPS:-30}
 
 # shellcheck disable=SC2086
 log_writable "$LOG" || LOG=/dev/null   # never let the log break the launch
 python3 "$HOST" --mode saver --saver 1 --speed 6 $DEBUG_ARG \
-    --with-orbits --with-labels --fps "$SAVER_FPS" --url "$PAGE" "$@" >>"$LOG" 2>&1 &
+    --no-orbits --with-labels --fps "$SAVER_FPS" --url "$PAGE" "$@" >>"$LOG" 2>&1 &
 PID=$!
 RC=0
 

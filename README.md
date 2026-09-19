@@ -59,10 +59,10 @@ peste tot desktopul virtual) rămânea deasupra lor. Dovada: `import -window <id
 scena corectă în timp ce ecranul arăta desktopul. `--managed` păstrează comportamentul
 vechi, pentru comparație.
 
-**Orbite și etichete:** `solar-saver.sh` le cere explicit (`--with-orbits --with-labels`),
-pentru că un screensaver nu are interfață din care să le aprinzi. Verificat la nivel de
-DOM, cu exact URL-ul folosit de screensaver: `body:"saver"`, `orbits:"true"`,
-`labels:"true"`, zero erori; cu `orbits=0&labels=0` ambele devin `false`.
+**Etichete, fără orbite:** `solar-saver.sh` cere explicit `--with-labels --no-orbits` —
+un screensaver nu are interfață din care să le aprinzi, iar liniile orbitale se citesc ca
+agitație pe un ecran mare. Verificat la nivel de DOM, cu exact URL-ul folosit de
+screensaver: `body:"saver"`, `labels:"true"`, `orbits:"false"`, zero erori.
 
 **Ritmul de desenare:** implicit `--fps 30` (`SOLAR_SAVER_FPS`), fiindcă N monitoare
 înseamnă N randare WebKit; simularea avansează în continuare cu timpul real.

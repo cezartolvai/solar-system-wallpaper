@@ -173,6 +173,20 @@ lansat tema. Rețeta de depanare (cu debug-ul daemonului în timpul activării) 
   fereastră părinte override-redirect de 640×400: potrivire de visual, `IsViewable`,
   conținut propriu 29,8 % negri, 4,59 % din pixeli schimbați în 2 s (animație vie).
 
+## 2026-09-19 — v1.0.7
+
+- **Screensaverul renunță la orbite, păstrează etichetele.** Lansatorul cere acum
+  `--no-orbits --with-labels` (înainte `--with-orbits --with-labels`): liniile orbitale se
+  citesc ca agitație pe un ecran mare, etichetele rămân utile ca să știi ce privești.
+  Rămâne **câte o instanță pe fiecare monitor**, cu scena ei completă, la 30 fps.
+- Verificat la nivel de DOM cu URL-ul exact folosit de screensaver:
+  `?saver=1&speed=6.0&fps=30.0&orbits=0&labels=1` → `body:"saver"`, `labels:"true"`,
+  `orbits:"false"`, zero erori. Și pe ecran, cu lansatorul real: două ferestre
+  (`1920x1080+0+0`, `1920x1080+1920+0`, ambele `IsViewable`), ambele monitoare cu cerul
+  nocturn (std 9,3 / 32,6 % negri, respectiv 14,7 / 31,3 %).
+- Reamintire: `--no-*` se aplică înaintea `--with-*`, deci `--with-labels` câștigă chiar
+  dacă cineva adaugă `--no-labels` la argumentele scriptului.
+
 ---
 
 ## Cum adaugi o versiune nouă

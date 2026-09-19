@@ -24,12 +24,12 @@ O simulare 3D interactivă a sistemului solar, scrisă într-un **singur fișier
 
 Rulează `./verify.sh` pentru a compara checksum-urile de mai jos cu fișierele actuale.
 
-| fișier | rol | sha256 (v1.0.6) |
+| fișier | rol | sha256 (v1.0.7) |
 |---|---|---|
 | `solar-system-3d.html` | simularea: date astronomice, pipeline 3D scris de mână, interfață, modul `?saver` | `3372f3dfdf6cfea0…` |
 | `solar-webkit.py` | gazda GTK3 + WebKit2GTK: **un panou per monitor** (fereastră + WebView), override-redirect pentru ferestrele proprii de screensaver (`--managed` păstrează modul gestionat), fundal live, embedding prin reparentare X11 (`--wid`, contractul `XSCREENSAVER_WINDOW`), `--selftest`, `--geometry-check`, `--print`, `--fps` | `42ff0f71b0a4ab70…` |
 | `solar-wallpaper.sh` | lansatorul de fundal: citește `wallpaper.conf`, pornește fără argumente | `e4fa51608b12456f…` |
-| `solar-saver.sh` | lansatorul de screensaver: jurnal (cu fallback dacă nu e scriibil), DPMS, orbite + etichete explicite, 30 fps, robust la mediu minimal | `e9c88ba3ca8f3cdd…` |
+| `solar-saver.sh` | lansatorul de screensaver: jurnal (cu fallback dacă nu e scriibil), DPMS, etichete aprinse, orbite stinse, 30 fps, robust la mediu minimal | `71c8fa5cebd84229…` |
 | `install-solar-screensaver.sh` | installer/dezinstaler: copiază în `~/.local`, scrie tema, autostartul și `wallpaper.conf` | `2bea6fd4abddc04b…` |
 | `README.md` | ghidul complet (română): instalare, parametri, capcane, alternativă Wayland | — |
 | `MANIFEST.md` | acest fișier | — |
@@ -84,12 +84,12 @@ nucleu la 60 fps nelimitat. Lansatorul fundalului limitează desenarea la **30 f
 Screensaverul (`solar-saver.sh`) nu se configurează din fișier: pornește mereu gazda cu
 
 ```
---mode saver --saver 1 --speed 6 --with-orbits --with-labels --fps 30
+--mode saver --saver 1 --speed 6 --no-orbits --with-labels --fps 30
 ```
 
 adică **o copie pe fiecare monitor** (gazda își deschide singură ferestrele, câte una per
-monitor), cu orbite și etichete aprinse (screensaverul nu are interfață), desenate la
-30 fps. `SOLAR_SAVER_FPS` schimbă limita. Argumentele suplimentare date scriptului se
+monitor), cu etichete aprinse și fără linii orbitale (screensaverul nu are interfață, iar
+orbitele se citesc ca agitație pe un ecran mare), desenate la 30 fps. `SOLAR_SAVER_FPS` schimbă limita. Argumentele suplimentare date scriptului se
 transmit gazdei (ex. `./solar-saver.sh --monitor 1` = doar monitorul 2, pentru teste).
 
 Setări MATE relevante:
